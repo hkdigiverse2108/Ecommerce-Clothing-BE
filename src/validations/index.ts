@@ -13,3 +13,4 @@ export * from "./taxValidations";
 export * from "./orderValidations";
 export * from "./reviewValidations";
 export * from "./bannerValidations";
+export * from "./walletValidations";

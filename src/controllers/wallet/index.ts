@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import { apiResponse, STATUS_CODE, TransactionStatus, TransactionType } from "../../common";
 import { TransactionModel, UserModel } from "../../database";
-import { countData, createData, getData, updateData } from "../../helpers";
+import { countData, createData, getData, updateData, responseMessage } from "../../helpers";
+import { addMoneyValidation, getTransactionsValidation } from "../../validations";
 
 export const getWallet = async (req: Request, res: Response) => {
     try {
@@ -17,9 +18,12 @@ export const getWallet = async (req: Request, res: Response) => {
 
 export const getTransactions = async (req: Request, res: Response) => {
     try {
+        const { error, value } = getTransactionsValidation.validate(req.query);
+        if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
+
         const user: any = req.headers.user;
         const userId = user._id;
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 10 } = value;
 
         const skip = (Number(page) - 1) * Number(limit);
 
@@ -44,13 +48,12 @@ export const getTransactions = async (req: Request, res: Response) => {
 
 export const addMoney = async (req: Request, res: Response) => {
     try {
+        const { error, value } = addMoneyValidation.validate(req.body);
+        if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
+
         const user: any = req.headers.user;
         const userId = user._id;
-        const { amount, description } = req.body;
-
-        if (!amount || amount <= 0) {
-            return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, "Invalid amount", null, null));
-        }
+        const { amount, description } = value;
 
         const balanceBefore = user.wallet.balance;
         const balanceAfter = balanceBefore + amount;
