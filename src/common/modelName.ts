@@ -1,0 +1,14 @@
+export const userModelName = "user";
+export const addressModelName = "address";
+export const deleteRequestModelName = "deleteRequest";
+export const categoryModelName = "category";
+export const productModelName = "product";
+export const variantModelName = "variant";
+export const colorModelName = "color";
+export const wishlistModelName = "wishlist";
+export const cartModelName = "cart";
+export const couponModelName = "coupon";
+export const taxModelName = "tax";
+export const orderModelName = "order";
+export const reviewModelName = "review";
+export const bannerModelName = "banner";
