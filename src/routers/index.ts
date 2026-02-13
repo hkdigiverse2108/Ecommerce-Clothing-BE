@@ -14,6 +14,7 @@ import taxRouter from "./taxRouter";
 import orderRouter from "./orderRouter";
 import reviewRouter from "./reviewRouter";
 import bannerRouter from "./bannerRouter";
+import walletRouter from "./walletRouter";
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use("/tax", taxRouter);
 router.use("/order", orderRouter);
 router.use("/review", reviewRouter);
 router.use("/banner", bannerRouter);
+router.use("/wallet", walletRouter);
 
 export { router };

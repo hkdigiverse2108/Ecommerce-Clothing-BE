@@ -1,5 +1,5 @@
-import { apiResponse, STATUS_CODE, PaymentStatus, PaymentMethod, OrderStatus } from "../../common";
-import { OrderModel, CartModel, ProductModel, VariantModel, AddressModel } from "../../database";
+import { apiResponse, STATUS_CODE, PaymentStatus, PaymentMethod, OrderStatus, TransactionType, TransactionStatus } from "../../common";
+import { OrderModel, CartModel, ProductModel, VariantModel, AddressModel, TransactionModel, UserModel } from "../../database";
 import { responseMessage, getFirstMatch, createData, updateData, deleteData, countData, getData } from "../../helpers";
 import { createOrderValidation, getMyOrdersValidation, getOrderByIdValidation } from "../../validations";
 
@@ -10,7 +10,8 @@ export const createOrder = async (req, res) => {
         const { error, value } = createOrderValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
 
-        const userId = req.headers.user._id;
+        const user = req.headers.user;
+        const userId = user._id;
         const { shippingAddressId, billingAddressId, paymentMethod, paymentId, productId, variantId, quantity } = value;
 
         let orderItems: any[] = [];
@@ -93,39 +94,23 @@ export const createOrder = async (req, res) => {
 
         const finalAmount = Math.max(0, subtotal - discount + tax + shipping);
 
-        // Payment Processing
+        // Payment Processing Preparation
         let paymentStatus = PaymentStatus.PENDING;
-        if (paymentMethod === PaymentMethod.ONLINE) {
-            if (!paymentId) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Payment ID required for online payment"), {}, {}));
 
-            // Initialize Razorpay with Placeholder Keys
-            // TODO: Replace with keys from SettingsModel
-            const razorpay = new Razorpay({
-                key_id: "rzp_test_PLACEHOLDER",
-                key_secret: "PLACEHOLDER_SECRET"
-            });
-
-            try {
-                // Verify Payment (Fetch payment details)
-                const payment = await razorpay.payments.fetch(paymentId);
-
-                if (payment.status === "captured") {
-                    paymentStatus = PaymentStatus.COMPLETED;
-                } else {
-                    return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Payment not captured"), {}, {}));
-                }
-            } catch (error) {
-                console.log("Razorpay Error (Likely due to invalid keys):", error);
-                return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Payment verification failed"), {}, error));
+        // WALLET PRE-CHECK (Optimistic)
+        if (paymentMethod === PaymentMethod.WALLET) {
+            const currentUser = await getFirstMatch(UserModel, { _id: userId }, {}, {});
+            if (!currentUser || currentUser.wallet.balance < finalAmount) {
+                return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Insufficient wallet balance"), {}, {}));
             }
         }
 
-        // Create Order
+        // Create Pending Order
         const orderData = {
             userId,
             orderNumber: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             orderStatus: OrderStatus.PENDING,
-            paymentStatus,
+            paymentStatus, // Initially PENDING
             totalAmount: subtotal,
             shippingAddress: shippingAddressId,
             billingAddress: billingAddressId || shippingAddressId,
@@ -142,7 +127,68 @@ export const createOrder = async (req, res) => {
 
         const newOrder = await createData(OrderModel, orderData);
 
-        // Inventory Update & Cart Cleanup
+        // Process Payment (Post Order Creation)
+        if (paymentMethod === PaymentMethod.ONLINE) {
+            if (!paymentId) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Payment ID required for online payment"), {}, {}));
+
+            const razorpay = new Razorpay({
+                key_id: "rzp_test_PLACEHOLDER",
+                key_secret: "PLACEHOLDER_SECRET"
+            });
+
+            try {
+                const payment = await razorpay.payments.fetch(paymentId);
+                if (payment.status === "captured") {
+                    paymentStatus = PaymentStatus.COMPLETED;
+                    await updateData(OrderModel, { _id: newOrder._id }, { paymentStatus: PaymentStatus.COMPLETED }, {});
+                } else {
+                    // If online payment failed (or wasn't captured), we leave it as Pending or mark as Failed?
+                    // Usually for 'captured' check it's strictly success.
+                    await updateData(OrderModel, { _id: newOrder._id }, { paymentStatus: PaymentStatus.FAILED, orderStatus: OrderStatus.CANCELLED }, {});
+                    return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Payment not captured"), {}, {}));
+                }
+            } catch (error) {
+                console.log("Razorpay Error:", error);
+                await updateData(OrderModel, { _id: newOrder._id }, { paymentStatus: PaymentStatus.FAILED, orderStatus: OrderStatus.CANCELLED }, {});
+                return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Payment verification failed"), {}, error));
+            }
+        } else if (paymentMethod === PaymentMethod.WALLET) {
+            // Atomic Deduction
+            const updatedUser = await updateData(UserModel,
+                { _id: userId, "wallet.balance": { $gte: finalAmount } },
+                { $inc: { "wallet.balance": -finalAmount } },
+                { new: true }
+            );
+
+            if (updatedUser) {
+                // Deduction Success
+                paymentStatus = PaymentStatus.COMPLETED;
+
+                await updateData(OrderModel, { _id: newOrder._id }, { paymentStatus: PaymentStatus.COMPLETED }, {});
+
+                // Record Transaction
+                await createData(TransactionModel, {
+                    user: userId,
+                    amount: finalAmount,
+                    type: TransactionType.DEBIT,
+                    description: `Payment for Order #${newOrder.orderNumber}`,
+                    status: TransactionStatus.COMPLETED,
+                    balanceBefore: updatedUser.wallet.balance + finalAmount,
+                    balanceAfter: updatedUser.wallet.balance,
+                });
+            } else {
+                // Deduction Failed (Insufficient Funds likely, or race condition)
+                await updateData(OrderModel, { _id: newOrder._id }, { paymentStatus: PaymentStatus.FAILED, orderStatus: OrderStatus.CANCELLED }, {});
+                return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Payment failed: Insufficient wallet balance"), {}, {}));
+            }
+        }
+
+        // Inventory Update & Cart Cleanup (Only if payment is successful or COD)
+        // If Wallet/Online payment failed, we already returned or cancelled.
+        // For COD, paymentStatus is PENDING but we confirm order.
+
+        // Note: For Online/Wallet, we only reach here if payment was successful (User updated or Razorpay verified)
+
         if (isBuyNow) {
             if (variantId) {
                 await updateData(VariantModel, { _id: variantId }, { $inc: { stock: -quantity } }, {});
@@ -160,7 +206,10 @@ export const createOrder = async (req, res) => {
             await deleteData(CartModel, { userId });
         }
 
-        return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage("Order placed successfully"), newOrder, {}));
+        // Refetch order to get latest status if needed, or just return newOrder with updated status
+        const finalOrder = await getFirstMatch(OrderModel, { _id: newOrder._id }, {}, {});
+
+        return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage("Order placed successfully"), finalOrder, {}));
 
     } catch (error: any) {
         console.error("Create Order Error:", error);

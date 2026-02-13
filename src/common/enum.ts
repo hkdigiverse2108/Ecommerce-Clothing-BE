@@ -55,6 +55,7 @@ export enum PaymentStatus {
 export enum PaymentMethod {
     COD = "cod",
     ONLINE = "online",
+    WALLET = "wallet",
 }
 
 export enum OrderStatus {
@@ -65,3 +66,14 @@ export enum OrderStatus {
     CANCELLED = "cancelled",
 }
 
+
+export enum TransactionType {
+    CREDIT = 'CREDIT',
+    DEBIT = 'DEBIT',
+}
+
+export enum TransactionStatus {
+    PENDING = 'PENDING',
+    COMPLETED = 'COMPLETED',
+    FAILED = 'FAILED',
+}

@@ -13,3 +13,4 @@ export * as taxController from "./tax";
 export * as orderController from "./order";
 export * as reviewController from "./review";
 export * as bannerController from "./banner";
+export * as walletController from "./wallet";

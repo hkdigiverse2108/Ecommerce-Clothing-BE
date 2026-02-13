@@ -10,6 +10,12 @@ const activeSessionSchema = new mongoose.Schema({
     expiresAt: { type: Date },
 }, { _id: false });
 
+const walletSchema = new mongoose.Schema({
+    balance: { type: Number, default: 0 },
+    currency: { type: String, default: "INR" },
+    isActive: { type: Boolean, default: true },
+}, { _id: false });
+
 export interface IUser {
     _id: string;
     name: string;
@@ -26,6 +32,11 @@ export interface IUser {
     socialId: string;
     pin: string;
     otp: string;
+    wallet: {
+        balance: number;
+        currency: string;
+        isActive: boolean;
+    };
     activeSession: any[];
     isActive: boolean;
     isDeleted: boolean;
@@ -46,6 +57,7 @@ const userSchema = new mongoose.Schema({
     socialId: { type: String, default: null },
     pin: { type: String },
     otp: { type: String },
+    wallet: { type: walletSchema, default: () => ({}) },
     activeSession: { type: [activeSessionSchema], default: [] },
     isActive: { type: Boolean, default: true },
     isDeleted: { type: Boolean, default: false },

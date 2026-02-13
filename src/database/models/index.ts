@@ -12,3 +12,4 @@ export * from "./taxModel";
 export * from "./orderModel";
 export * from "./reviewModel";
 export * from "./bannerModel";
+export * from "./transactionModel";

@@ -1,5 +1,5 @@
 import joi from "joi";
-import { objectId, commonIdSchema } from "../common/validations";
+import { objectId, commonIdSchema } from "../common";
 
 export const addAddressValidation = joi.object({
     userId: objectId().required(),

@@ -12,3 +12,4 @@ export const taxModelName = "tax";
 export const orderModelName = "order";
 export const reviewModelName = "review";
 export const bannerModelName = "banner";
+export const transactionModelName = "transaction";
