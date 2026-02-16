@@ -45,9 +45,9 @@ export const updateUser = async (req, res) => {
         const { error, value } = updateProfileValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
 
-        const { userId, ...rest } = value;
+        const userId = (req as any).headers.user._id;
 
-        const user = await updateData(UserModel, { _id: userId, isDeleted: false }, rest, { new: true });
+        const user = await updateData(UserModel, { _id: userId, isDeleted: false }, value, { new: true });
 
         if (!user) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("User not found"), {}, {}));
 

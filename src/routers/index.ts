@@ -15,10 +15,16 @@ import orderRouter from "./orderRouter";
 import reviewRouter from "./reviewRouter";
 import bannerRouter from "./bannerRouter";
 import walletRouter from "./walletRouter";
+import uploadRouter from "./uploadRouter";
+import { verifyToken } from "../helpers/jwt";
 
 const router = Router();
 
 router.use("/auth", authRouter);
+router.use("/upload", uploadRouter);
+
+router.use(verifyToken);
+
 router.use("/user", userRouter);
 router.use("/delete-request", deleteRequestRouter);
 router.use("/address", addressRouter);

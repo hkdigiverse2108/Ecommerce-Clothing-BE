@@ -2,7 +2,6 @@ import joi from "joi";
 import { AccountType, objectId, commonIdSchema } from "../common";
 
 export const updateProfileValidation = joi.object({
-    userId: objectId().required(),
     profilePicture: joi.string().optional(),
     name: joi.string().optional(),
     nickName: joi.string().optional(),
