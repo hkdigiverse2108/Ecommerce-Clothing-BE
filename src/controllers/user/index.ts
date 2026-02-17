@@ -3,7 +3,7 @@ import { STATUS_CODE, apiResponse } from "../../common";
 import { UserModel } from "../../database";
 import { responseMessage, getData, countData, removeSensitiveData, updateData, getFirstMatch, createData, reqInfo } from "../../helpers";
 
-import { deleteRequestModel } from "../../database/models/deleteRequestModel";
+import { deleteRequestModel } from "../../database";
 
 export const getUsers = async (req, res) => {
     reqInfo(req);
