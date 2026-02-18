@@ -15,7 +15,7 @@ export const addBanner = async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).json(new apiResponse(STATUS_CODE.INTERNAL_SERVER_ERROR, responseMessage.internalServerError, {}, error));
+        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).json(new apiResponse(STATUS_CODE.INTERNAL_SERVER_ERROR, responseMessage.internalServerError, {}, (error as any).message || error));
     }
 };
 
@@ -31,7 +31,7 @@ export const updateBanner = async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).json(new apiResponse(STATUS_CODE.INTERNAL_SERVER_ERROR, responseMessage.internalServerError, {}, error));
+        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).json(new apiResponse(STATUS_CODE.INTERNAL_SERVER_ERROR, responseMessage.internalServerError, {}, (error as any).message || error));
     }
 };
 
@@ -63,7 +63,7 @@ export const getBanner = async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).json(new apiResponse(STATUS_CODE.INTERNAL_SERVER_ERROR, responseMessage.internalServerError, {}, error));
+        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).json(new apiResponse(STATUS_CODE.INTERNAL_SERVER_ERROR, responseMessage.internalServerError, {}, (error as any).message || error));
     }
 };
 
@@ -79,7 +79,7 @@ export const getBannerById = async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).json(new apiResponse(STATUS_CODE.INTERNAL_SERVER_ERROR, responseMessage.internalServerError, {}, error));
+        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).json(new apiResponse(STATUS_CODE.INTERNAL_SERVER_ERROR, responseMessage.internalServerError, {}, (error as any).message || error));
     }
 };
 
@@ -95,6 +95,6 @@ export const deleteBanner = async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).json(new apiResponse(STATUS_CODE.INTERNAL_SERVER_ERROR, responseMessage.internalServerError, {}, error));
+        return res.status(STATUS_CODE.INTERNAL_SERVER_ERROR).json(new apiResponse(STATUS_CODE.INTERNAL_SERVER_ERROR, responseMessage.internalServerError, {}, (error as any).message || error));
     }
 };
