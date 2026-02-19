@@ -1,9 +1,114 @@
 import { skip } from "node:test";
-import { apiResponse, productModelName, reviewModelName, STATUS_CODE } from "../../common";
+import { apiResponse, orderModelName, productModelName, reviewModelName, STATUS_CODE } from "../../common";
 import { ProductModel, VariantModel, OrderModel, ReviewModel } from "../../database";
 import { countData, createData, getData, responseMessage, updateData, getFirstMatch, aggregateData } from "../../helpers";
 import { addProductValidation, getProductValidation, updateProductValidation, getProductByIdValidation, deleteProductValidation, getProductBySlugValidation } from "../../validations";
-import { fetchSingleProductStats, getProductStatsStages } from "./stats";
+import mongoose from "mongoose";
+
+export const getProductStatsStages = () => {
+    return [
+        {
+            $lookup: {
+                from: reviewModelName,
+                localField: "_id",
+                foreignField: "productId",
+                pipeline: [
+                    {
+                        $group: {
+                            _id: "$productId",
+                            averageRating: { $avg: "$rating" },
+                            totalReviews: { $sum: 1 }
+                        }
+                    }
+                ],
+                as: "reviews"
+            }
+        },
+        {
+            $lookup: {
+                from: orderModelName,
+                localField: "_id",
+                foreignField: "orderItems.productId",
+                pipeline: [
+                    { $unwind: "$orderItems" },
+                    {
+                        $group: {
+                            _id: "$orderItems.productId",
+                            totalSold: { $sum: "$orderItems.quantity" }
+                        }
+                    }
+                ],
+                as: "orders"
+            }
+        },
+        {
+            $addFields: {
+                rating: { $ifNull: [{ $arrayElemAt: ["$reviews.averageRating", 0] }, 0] },
+                totalReviews: { $ifNull: [{ $arrayElemAt: ["$reviews.totalReviews", 0] }, 0] },
+                totalSold: { $ifNull: [{ $arrayElemAt: ["$orders.totalSold", 0] }, 0] }
+            }
+        },
+        {
+            $project: {
+                reviews: 0,
+                orders: 0
+            }
+        }
+    ];
+};
+
+export const fetchSingleProductStats = async (productId: string | mongoose.Types.ObjectId) => {
+    const stats = await aggregateData(ReviewModel, [
+        { $match: { productId: new mongoose.Types.ObjectId(productId.toString()) } },
+        {
+            $facet: {
+                reviewStats: [
+                    {
+                        $group: {
+                            _id: "$productId",
+                            averageRating: { $avg: "$rating" },
+                            totalReviews: { $sum: 1 }
+                        }
+                    }
+                ],
+                orderStats: [
+                    {
+                        $lookup: {
+                            from: orderModelName,
+                            pipeline: [
+                                { $unwind: "$orderItems" },
+                                { $match: { "orderItems.productId": new mongoose.Types.ObjectId(productId.toString()) } },
+                                {
+                                    $group: {
+                                        _id: "$orderItems.productId",
+                                        totalSold: { $sum: "$orderItems.quantity" }
+                                    }
+                                }
+                            ],
+                            as: "sales"
+                        }
+                    },
+                    { $unwind: { path: "$sales", preserveNullAndEmptyArrays: true } },
+                    {
+                        $group: {
+                            _id: null,
+                            totalSold: { $sum: "$sales.totalSold" }
+                        }
+                    }
+                ]
+            }
+        }
+    ]);
+
+    const reviewInfo = stats[0]?.reviewStats[0] || { averageRating: 0, totalReviews: 0 };
+    const orderInfo = stats[0]?.orderStats[0] || { totalSold: 0 };
+
+    return {
+        rating: reviewInfo.averageRating || 0,
+        totalReviews: reviewInfo.totalReviews || 0,
+        totalSold: orderInfo.totalSold || 0
+    };
+};
 
 export const addProduct = async (req, res) => {
     try {
