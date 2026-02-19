@@ -3,6 +3,7 @@ import { apiResponse, productModelName, reviewModelName, STATUS_CODE } from "../
 import { ProductModel, VariantModel, OrderModel, ReviewModel } from "../../database";
 import { countData, createData, getData, responseMessage, updateData, getFirstMatch, aggregateData } from "../../helpers";
 import { addProductValidation, getProductValidation, updateProductValidation, getProductByIdValidation, deleteProductValidation, getProductBySlugValidation } from "../../validations";
+import { fetchSingleProductStats, getProductStatsStages } from "./stats";
 
 export const addProduct = async (req, res) => {
     try {
@@ -67,12 +68,34 @@ export const getProduct = async (req, res) => {
             query.basePrice = { $gte: priceFilter[0], $lte: priceFilter[1] };
         }
 
-        const skip = (page - 1) * limit;
+        const skipVal = (page - 1) * limit;
 
-        const products = await getData(ProductModel, query, {}, { skip, limit });
+        const products = await aggregateData(ProductModel, [
+            { $match: { ...query, isDeleted: false } },
+            { $sort: { createdAt: -1 } },
+            { $skip: skipVal },
+            { $limit: limit },
+            ...getProductStatsStages(),
+            {
+                $project: {
+                    product: "$$ROOT",
+                    rating: 1,
+                    totalReviews: 1,
+                    totalSold: 1
+                }
+            },
+            {
+                $project: {
+                    "product.rating": 0,
+                    "product.totalReviews": 0,
+                    "product.totalSold": 0
+                }
+            }
+        ]);
+
         if (!products) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Products not found"), {}, {}));
 
-        const total = await countData(ProductModel, query);
+        const total = await countData(ProductModel, { ...query, isDeleted: false });
 
         return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage("Products fetched successfully"), {
             products, total, state: {
@@ -102,25 +125,18 @@ export const getProductById = async (req, res) => {
             variants = await getData(VariantModel, { productId: id, isDeleted: false }, {}, {});
         }
 
-        // Fetch Review Stats
-        const reviewStats = await aggregateData(ReviewModel, [
-            { $match: { productId: product._id } },
-            {
-                $group: {
-                    _id: "$productId",
-                    averageRating: { $avg: "$rating" },
-                    totalReviews: { $sum: 1 }
-                }
-            }
-        ]);
-
-        const ratingInfo = reviewStats.length > 0 ? reviewStats[0] : { averageRating: 0, totalReviews: 0 };
+        // Fetch All Stats (Ratings, Reviews, Sales)
+        const ratingInfo = await fetchSingleProductStats(product._id);
 
         const responseData = {
-            ...product.toObject(),
-            variants,
-            rating: ratingInfo.averageRating,
-            totalReviews: ratingInfo.totalReviews
+            _id: product._id,
+            rating: ratingInfo.rating,
+            totalReviews: ratingInfo.totalReviews,
+            totalSold: ratingInfo.totalSold,
+            product: {
+                ...product,
+                variants,
+            }
         };
 
         return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.getDataSuccess("Product"), responseData, {}));
@@ -161,25 +177,18 @@ export const getProductBySlug = async (req, res) => {
             variants = await getData(VariantModel, { productId: product._id, isDeleted: false }, {}, {});
         }
 
-        // Fetch Review Stats
-        const reviewStats = await aggregateData(ReviewModel, [
-            { $match: { productId: product._id } },
-            {
-                $group: {
-                    _id: "$productId",
-                    averageRating: { $avg: "$rating" },
-                    totalReviews: { $sum: 1 }
-                }
-            }
-        ]);
-
-        const ratingInfo = reviewStats.length > 0 ? reviewStats[0] : { averageRating: 0, totalReviews: 0 };
+        // Fetch All Stats (Ratings, Reviews, Sales)
+        const ratingInfo = await fetchSingleProductStats(product._id);
 
         const responseData = {
-            ...product.toObject(),
-            variants,
-            rating: ratingInfo.averageRating,
-            totalReviews: ratingInfo.totalReviews
+            _id: product._id,
+            rating: ratingInfo.rating,
+            totalReviews: ratingInfo.totalReviews,
+            totalSold: ratingInfo.totalSold,
+            product: {
+                ...(product.toObject ? product.toObject() : product),
+                variants
+            }
         };
 
         return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.getDataSuccess("Product"), responseData, {}));
@@ -210,29 +219,7 @@ export const getPopularProducts = async (req, res) => {
                 }
             },
             { $unwind: "$product" },
-            {
-                $lookup: {
-                    from: reviewModelName,
-                    localField: "_id",
-                    foreignField: "productId",
-                    pipeline: [
-                        {
-                            $group: {
-                                _id: "$productId",
-                                averageRating: { $avg: "$rating" },
-                                totalReviews: { $sum: 1 }
-                            }
-                        }
-                    ],
-                    as: "reviews"
-                }
-            },
-            {
-                $addFields: {
-                    rating: { $ifNull: [{ $arrayElemAt: ["$reviews.averageRating", 0] }, 0] },
-                    totalReviews: { $ifNull: [{ $arrayElemAt: ["$reviews.totalReviews", 0] }, 0] }
-                }
-            },
+            ...getProductStatsStages(),
             {
                 $project: {
                     product: 1,
@@ -248,30 +235,7 @@ export const getPopularProducts = async (req, res) => {
                 { $match: { isDeleted: false, isActive: true } },
                 { $sort: { createdAt: -1 } },
                 { $limit: 10 },
-                {
-                    $lookup: {
-                        from: reviewModelName,
-                        localField: "_id",
-                        foreignField: "productId",
-                        pipeline: [
-                            {
-                                $group: {
-                                    _id: "$productId",
-                                    averageRating: { $avg: "$rating" },
-                                    totalReviews: { $sum: 1 }
-                                }
-                            }
-                        ],
-                        as: "reviews"
-                    }
-                },
-                {
-                    $addFields: {
-                        rating: { $ifNull: [{ $arrayElemAt: ["$reviews.averageRating", 0] }, 0] },
-                        totalReviews: { $ifNull: [{ $arrayElemAt: ["$reviews.totalReviews", 0] }, 0] },
-                        totalSold: 0
-                    }
-                },
+                ...getProductStatsStages(),
                 {
                     $project: {
                         product: "$$ROOT",
@@ -282,7 +246,6 @@ export const getPopularProducts = async (req, res) => {
                 },
                 {
                     $project: {
-                        "product.reviews": 0,
                         "product.rating": 0,
                         "product.totalReviews": 0,
                         "product.totalSold": 0
@@ -304,7 +267,23 @@ export const getRecommendedProducts = async (req, res) => {
         // Simple implementation: Random 10 active products
         const recommendedProducts = await aggregateData(ProductModel, [
             { $match: { isDeleted: false, isActive: true } },
-            { $sample: { size: 10 } }
+            { $sample: { size: 10 } },
+            ...getProductStatsStages(),
+            {
+                $project: {
+                    product: "$$ROOT",
+                    rating: 1,
+                    totalReviews: 1,
+                    totalSold: 1
+                }
+            },
+            {
+                $project: {
+                    "product.rating": 0,
+                    "product.totalReviews": 0,
+                    "product.totalSold": 0
+                }
+            }
         ]);
 
         return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage("Recommended products fetched successfully"), recommendedProducts, {}));
@@ -358,16 +337,23 @@ export const getOfferProducts = async (req, res) => {
                     variant: { $first: "$$ROOT" }, // Take the best offer variant
                     product: { $first: "$product" }
                 }
-            }
+            },
+            ...getProductStatsStages()
         ]);
 
         // Flatten stats
         const result = offers.map(item => ({
-            ...item.product,
-            offerVariant: {
-                price: item.variant.price,
-                compareAtPrice: item.variant.compareAtPrice,
-                discountPercentage: item.variant.discountPercentage
+            _id: item._id,
+            rating: item.rating,
+            totalReviews: item.totalReviews,
+            totalSold: item.totalSold,
+            product: {
+                ...item.product,
+                offerVariant: {
+                    price: item.variant.price,
+                    compareAtPrice: item.variant.compareAtPrice,
+                    discountPercentage: item.variant.discountPercentage
+                }
             }
         }));
 
