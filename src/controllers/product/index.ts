@@ -178,7 +178,7 @@ export const getProduct = async (req, res) => {
         const products = await aggregateData(ProductModel, [
             { $match: { ...query, isDeleted: false } },
             { $sort: { createdAt: -1 } },
-            { $skip: skipVal },
+            ...(skipVal ? [{ $skip: skipVal }] : []),
             ...(limit ? [{ $limit: limit }] : []),
             ...getProductStatsStages(),
             {
