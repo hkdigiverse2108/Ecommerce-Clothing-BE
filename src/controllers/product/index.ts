@@ -166,7 +166,7 @@ export const getProduct = async (req, res) => {
         }
 
         if (categoryFilter) {
-            query.categoryId = categoryFilter;
+            query.categoryId = new mongoose.Types.ObjectId(categoryFilter);
         }
 
         if (priceFilter) {
