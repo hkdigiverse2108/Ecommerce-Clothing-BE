@@ -191,7 +191,7 @@ export const getProductBySlug = async (req, res) => {
 
 export const getPopularProducts = async (req, res) => {
     try {
-        const popularProducts = await aggregateData(OrderModel, [
+        let popularProducts = await aggregateData(OrderModel, [
             { $unwind: "$orderItems" },
             {
                 $group: {
@@ -238,11 +238,58 @@ export const getPopularProducts = async (req, res) => {
                     product: 1,
                     totalSold: 1,
                     rating: 1,
-                    totalReviews: 1,
-                    reviews: 0
+                    totalReviews: 1
                 }
             }
         ]);
+
+        if (popularProducts.length == 0) {
+            popularProducts = await aggregateData(ProductModel, [
+                { $match: { isDeleted: false, isActive: true } },
+                { $sort: { createdAt: -1 } },
+                { $limit: 10 },
+                {
+                    $lookup: {
+                        from: reviewModelName,
+                        localField: "_id",
+                        foreignField: "productId",
+                        pipeline: [
+                            {
+                                $group: {
+                                    _id: "$productId",
+                                    averageRating: { $avg: "$rating" },
+                                    totalReviews: { $sum: 1 }
+                                }
+                            }
+                        ],
+                        as: "reviews"
+                    }
+                },
+                {
+                    $addFields: {
+                        rating: { $ifNull: [{ $arrayElemAt: ["$reviews.averageRating", 0] }, 0] },
+                        totalReviews: { $ifNull: [{ $arrayElemAt: ["$reviews.totalReviews", 0] }, 0] },
+                        totalSold: 0
+                    }
+                },
+                {
+                    $project: {
+                        product: "$$ROOT",
+                        totalSold: 1,
+                        rating: 1,
+                        totalReviews: 1
+                    }
+                },
+                {
+                    $project: {
+                        "product.reviews": 0,
+                        "product.rating": 0,
+                        "product.totalReviews": 0,
+                        "product.totalSold": 0
+                    }
+                }
+            ]);
+        }
 
         return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage("Popular products fetched successfully"), popularProducts, {}));
 
