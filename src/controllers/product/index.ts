@@ -173,13 +173,13 @@ export const getProduct = async (req, res) => {
             query.basePrice = { $gte: priceFilter[0], $lte: priceFilter[1] };
         }
 
-        const skipVal = (page - 1) * limit;
+        const skipVal = page > 1 ? (page - 1) * limit : 0;
 
         const products = await aggregateData(ProductModel, [
             { $match: { ...query, isDeleted: false } },
             { $sort: { createdAt: -1 } },
             { $skip: skipVal },
-            { $limit: limit },
+            ...(limit ? [{ $limit: limit }] : []),
             ...getProductStatsStages(),
             {
                 $project: {
