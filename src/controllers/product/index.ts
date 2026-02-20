@@ -1,7 +1,7 @@
 import { skip } from "node:test";
-import { apiResponse, orderModelName, productModelName, reviewModelName, STATUS_CODE } from "../../common";
+import { apiResponse, orderModelName, productModelName, reviewModelName, STATUS_CODE, colorModelName } from "../../common";
 import { ProductModel, VariantModel, OrderModel, ReviewModel } from "../../database";
-import { countData, createData, getData, responseMessage, updateData, getFirstMatch, aggregateData } from "../../helpers";
+import { countData, createData, getData, responseMessage, updateData, getFirstMatch, aggregateData, findAllWithPopulate, findOneAndPopulate, aggregateAndPopulate } from "../../helpers";
 import { addProductValidation, getProductValidation, updateProductValidation, getProductByIdValidation, deleteProductValidation, getProductBySlugValidation } from "../../validations";
 import mongoose from "mongoose";
 
@@ -175,7 +175,7 @@ export const getProduct = async (req, res) => {
 
         const skipVal = page > 1 ? (page - 1) * limit : 0;
 
-        const products = await aggregateData(ProductModel, [
+        const products = await aggregateAndPopulate(ProductModel, [
             { $match: { ...query, isDeleted: false } },
             { $sort: { createdAt: -1 } },
             ...(skipVal ? [{ $skip: skipVal }] : []),
@@ -196,7 +196,7 @@ export const getProduct = async (req, res) => {
                     "product.totalSold": 0
                 }
             }
-        ]);
+        ], { path: "product.attributes.color", model: colorModelName });
 
         if (!products) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Products not found"), {}, {}));
 
@@ -221,13 +221,13 @@ export const getProductById = async (req, res) => {
 
         const { id } = value;
 
-        const product: any = await getFirstMatch(ProductModel, { _id: id, isDeleted: false }, {}, {});
+        const product: any = await findOneAndPopulate(ProductModel, { _id: id, isDeleted: false }, {}, {}, "attributes.color");
         if (!product) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Product not found"), {}, {}));
 
         // Fetch Variants
         let variants: any[] = [];
         if (product.hasVariants) {
-            variants = await getData(VariantModel, { productId: id, isDeleted: false }, {}, {});
+            variants = await findAllWithPopulate(VariantModel, { productId: id, isDeleted: false }, {}, {}, "attributes.colorId");
         }
 
         // Fetch All Stats (Ratings, Reviews, Sales)
@@ -273,13 +273,13 @@ export const getProductBySlug = async (req, res) => {
 
         const { slug } = value;
 
-        const product: any = await getFirstMatch(ProductModel, { slug, isDeleted: false }, {}, {});
+        const product: any = await findOneAndPopulate(ProductModel, { slug, isDeleted: false }, {}, {}, "attributes.color");
         if (!product) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Product not found"), {}, {}));
 
         // Fetch Variants
         let variants: any[] = [];
         if (product.hasVariants) {
-            variants = await getData(VariantModel, { productId: product._id, isDeleted: false }, {}, {});
+            variants = await findAllWithPopulate(VariantModel, { productId: product._id, isDeleted: false }, {}, {}, "attributes.colorId");
         }
 
         // Fetch All Stats (Ratings, Reviews, Sales)
@@ -335,8 +335,10 @@ export const getPopularProducts = async (req, res) => {
             }
         ]);
 
+        await ProductModel.populate(popularProducts, { path: "product.attributes.color", model: colorModelName });
+
         if (popularProducts.length == 0) {
-            popularProducts = await aggregateData(ProductModel, [
+            popularProducts = await aggregateAndPopulate(ProductModel, [
                 { $match: { isDeleted: false, isActive: true } },
                 { $sort: { createdAt: -1 } },
                 { $limit: 10 },
@@ -356,7 +358,7 @@ export const getPopularProducts = async (req, res) => {
                         "product.totalSold": 0
                     }
                 }
-            ]);
+            ], { path: "product.attributes.color", model: colorModelName });
         }
 
         return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage("Popular products fetched successfully"), popularProducts, {}));
@@ -370,7 +372,7 @@ export const getPopularProducts = async (req, res) => {
 export const getRecommendedProducts = async (req, res) => {
     try {
         // Simple implementation: Random 10 active products
-        const recommendedProducts = await aggregateData(ProductModel, [
+        const recommendedProducts = await aggregateAndPopulate(ProductModel, [
             { $match: { isDeleted: false, isActive: true } },
             { $sample: { size: 10 } },
             ...getProductStatsStages(),
@@ -389,7 +391,7 @@ export const getRecommendedProducts = async (req, res) => {
                     "product.totalSold": 0
                 }
             }
-        ]);
+        ], { path: "product.attributes.color", model: colorModelName });
 
         return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage("Recommended products fetched successfully"), recommendedProducts, {}));
 
@@ -445,6 +447,8 @@ export const getOfferProducts = async (req, res) => {
             },
             ...getProductStatsStages()
         ]);
+
+        await VariantModel.populate(offers, { path: "product.attributes.color", model: colorModelName });
 
         // Flatten stats
         const result = offers.map(item => ({
