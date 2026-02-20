@@ -36,7 +36,7 @@ export const updateVariantValidation = joi.object({
 });
 
 export const getVariantValidation = joi.object({
-    productFilter: objectId().required(),
+    productFilter: objectId().optional(),
     colorFilter: objectId().optional(),
     search: joi.string().allow("").optional(),
 });

@@ -7,11 +7,11 @@ const imageSchema = new mongoose.Schema({
 })
 
 const variantSchema = new mongoose.Schema({
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: productModelName },
-    sku: { type: String },
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: productModelName, index: true },
+    sku: { type: String, index: true },
     attributes: {
         size: { type: String },
-        colorId: { type: mongoose.Schema.Types.ObjectId, ref: colorModelName },
+        colorId: { type: mongoose.Schema.Types.ObjectId, ref: colorModelName, index: true },
     },
     price: { type: Number },
     compareAtPrice: { type: Number },
@@ -20,6 +20,8 @@ const variantSchema = new mongoose.Schema({
     images: [imageSchema],
     isActive: { type: Boolean, default: true },
     isDeleted: { type: Boolean, default: false },
-})
+}, { timestamps: true });
+
+variantSchema.index({ productId: 1, "attributes.size": 1, "attributes.colorId": 1 }, { unique: true });
 
 export const VariantModel = mongoose.model(variantModelName, variantSchema);

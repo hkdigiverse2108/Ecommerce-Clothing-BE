@@ -1,10 +1,11 @@
-import { apiResponse, STATUS_CODE } from "../../common";
+import { apiResponse, colorModelName, STATUS_CODE } from "../../common";
 import { VariantModel, ProductModel } from "../../database";
 import { ColorModel } from "../../database/models/colorModel";
-import { createData, getFirstMatch, updateData, getData, responseMessage } from "../../helpers";
+import { createData, getFirstMatch, updateData, getData, responseMessage, findAllWithPopulate, reqInfo } from "../../helpers";
 import { addVariantValidation, updateVariantValidation, getVariantValidation, getVariantByIdValidation, deleteVariantValidation } from "../../validations";
 
 export const addVariant = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = addVariantValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -36,6 +37,7 @@ export const addVariant = async (req, res) => {
 };
 
 export const updateVariant = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = updateVariantValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -79,12 +81,17 @@ export const updateVariant = async (req, res) => {
 };
 
 export const getVariants = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getVariantValidation.validate(req.query);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
 
         const { productFilter, colorFilter, search } = value;
-        const query: any = { productFilter };
+        const query: any = {};
+
+        if (productFilter) {
+            query.productId = productFilter;
+        }
 
         if (colorFilter) {
             query['attributes.colorId'] = colorFilter;
@@ -94,7 +101,10 @@ export const getVariants = async (req, res) => {
             query.sku = { $regex: search, $options: "si" };
         }
 
-        const variants = await getData(VariantModel, query, {}, {});
+        const variants = await findAllWithPopulate(VariantModel, query, {}, {}, {
+            path: "attributes.colorId",
+            model: colorModelName
+        });
         return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage("Variants fetched successfully"), variants, {}));
 
     } catch (error) {
@@ -104,6 +114,7 @@ export const getVariants = async (req, res) => {
 };
 
 export const getVariantById = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getVariantByIdValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -120,6 +131,7 @@ export const getVariantById = async (req, res) => {
 };
 
 export const deleteVariant = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = deleteVariantValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));

@@ -121,6 +121,7 @@ export const addToCart = async (req, res) => {
 };
 
 export const getCart = async (req, res) => {
+    reqInfo(req);
     try {
         const userId = req.headers.user._id;
         let cart: any = await getFirstMatch(CartModel, { userId }, {}, {});
