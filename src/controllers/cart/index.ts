@@ -1,7 +1,7 @@
 import { apiResponse, STATUS_CODE } from "../../common";
 import { CartModel, CouponModel, ProductModel, VariantModel } from "../../database";
 import { TaxModel } from "../../database/models/taxModel";
-import { responseMessage, createData, getData, updateData, getFirstMatch } from "../../helpers";
+import { responseMessage, createData, getData, updateData, getFirstMatch, reqInfo } from "../../helpers";
 import { addToCartValidation, applyCouponValidation, removeItemValidation, updateQuantityValidation } from "../../validations";
 
 const calcCartTotal = async (cart: any) => {
@@ -43,7 +43,7 @@ const calcCartTotal = async (cart: any) => {
     // Tax and Shipping logic can be added here
     const tax: any = await getFirstMatch(TaxModel, { isDefault: true, isActive: true, isDeleted: false }, {}, {});
     cart.tax = tax ? (cart.subtotal - cart.discount) * tax.percentage / 100 : 0;
-    cart.taxId = tax._id;
+    cart.taxId = tax ? tax._id : null;
     cart.shipping = 0;
 
     cart.total = Math.max(0, cart.subtotal - cart.discount + cart.tax + cart.shipping);
@@ -51,6 +51,7 @@ const calcCartTotal = async (cart: any) => {
 };
 
 export const addToCart = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = addToCartValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -60,6 +61,7 @@ export const addToCart = async (req, res) => {
             console.error("req.headers.user is missing!");
             return res.status(STATUS_CODE.UNAUTHORIZED).json(new apiResponse(STATUS_CODE.UNAUTHORIZED, responseMessage.customMessage("User not authenticated"), {}, {}));
         }
+        console.log(req.headers.user);
         const userId = req.headers.user._id;
 
 
