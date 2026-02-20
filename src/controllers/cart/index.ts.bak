@@ -6,28 +6,13 @@ import { addToCartValidation, applyCouponValidation, removeItemValidation, updat
 
 const calcCartTotal = async (cart: any) => {
     let subtotal = 0;
-
-    // Collect all IDs
-    const variantIds = cart.items.filter(item => item.variantId).map(item => item.variantId);
-    const productIds = cart.items.filter(item => !item.variantId).map(item => item.productId);
-
-    // Fetch data in parallel
-    const [variants, products] = await Promise.all([
-        VariantModel.find({ _id: { $in: variantIds } }).lean(),
-        ProductModel.find({ _id: { $in: productIds } }).lean()
-    ]);
-
-    // Create Maps for O(1) lookup
-    const variantMap = new Map(variants.map((v: any) => [v._id.toString(), v]));
-    const productMap = new Map(products.map((p: any) => [p._id.toString(), p]));
-
     for (const item of cart.items) {
         let price = 0;
         if (item.variantId) {
-            const variant: any = variantMap.get(item.variantId.toString());
+            const variant: any = await VariantModel.findById(item.variantId);
             price = variant ? variant.price : 0;
         } else {
-            const product: any = productMap.get(item.productId.toString());
+            const product: any = await ProductModel.findById(item.productId);
             price = product ? product.basePrice : 0;
         }
         subtotal += price * item.quantity;
@@ -37,7 +22,7 @@ const calcCartTotal = async (cart: any) => {
 
     let discount = 0;
     if (cart.couponCode) {
-        const coupon: any = await CouponModel.findById(cart.couponCode); // This is single optimized call per cart, acceptable
+        const coupon: any = await CouponModel.findById(cart.couponCode);
         if (coupon && coupon.isActive) {
             // Basic checks
             if (cart.subtotal >= coupon.minOrderAmount) {
