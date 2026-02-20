@@ -4,7 +4,15 @@ import { TaxModel } from "../../database/models/taxModel";
 import { responseMessage, createData, getData, updateData, getFirstMatch, reqInfo } from "../../helpers";
 import { addToCartValidation, applyCouponValidation, removeItemValidation, updateQuantityValidation } from "../../validations";
 
-const calcCartTotal = async (cart: any) => {
+let defaultTaxCache: any = null;
+
+const getDefaultTax = async () => {
+    if (defaultTaxCache) return defaultTaxCache;
+    defaultTaxCache = await getFirstMatch(TaxModel, { isDefault: true, isActive: true, isDeleted: false }, {}, {});
+    return defaultTaxCache;
+};
+
+const calcCartTotal = async (cart: any, coupon: any = null, tax: any = null) => {
     let subtotal = 0;
 
     // Collect all IDs
@@ -36,27 +44,23 @@ const calcCartTotal = async (cart: any) => {
     cart.subtotal = subtotal;
 
     let discount = 0;
-    if (cart.couponCode) {
-        const coupon: any = await CouponModel.findById(cart.couponCode); // This is single optimized call per cart, acceptable
-        if (coupon && coupon.isActive) {
-            // Basic checks
-            if (cart.subtotal >= coupon.minOrderAmount) {
-                if (coupon.discountType === "percentage") {
-                    discount = (cart.subtotal * coupon.discount) / 100;
-                    if (coupon.maxDiscountAmount > 0) {
-                        discount = Math.min(discount, coupon.maxDiscountAmount);
-                    }
-                } else {
-                    discount = coupon.discount;
+    if (coupon && coupon.isActive) {
+        // Basic checks
+        if (cart.subtotal >= coupon.minOrderAmount) {
+            if (coupon.discountType === "percentage") {
+                discount = (cart.subtotal * coupon.discount) / 100;
+                if (coupon.maxDiscountAmount > 0) {
+                    discount = Math.min(discount, coupon.maxDiscountAmount);
                 }
+            } else {
+                discount = coupon.discount;
             }
         }
     }
     cart.couponDiscount = discount;
     cart.discount = discount; // Total discount
 
-    // Tax and Shipping logic can be added here
-    const tax: any = await getFirstMatch(TaxModel, { isDefault: true, isActive: true, isDeleted: false }, {}, {});
+    // Tax and Shipping logic
     cart.tax = tax ? (cart.subtotal - cart.discount) * tax.percentage / 100 : 0;
     cart.taxId = tax ? tax._id : null;
     cart.shipping = 0;
@@ -78,33 +82,38 @@ export const addToCart = async (req, res) => {
         }
         const userId = req.headers.user._id;
 
+        // Atomic update: Try to increment quantity if item exists
+        let cart: any = await CartModel.findOneAndUpdate(
+            {
+                userId,
+                "items.productId": productId,
+                "items.variantId": variantId || null // Handle null variantId
+            },
+            { $inc: { "items.$.quantity": quantity } },
+            { new: true }
+        ).lean();
 
-
-        let cart: any = await getFirstMatch(CartModel, { userId }, {}, {});
-
+        // If item didn't exist, push it
         if (!cart) {
-
-            const newCart: any = await createData(CartModel, { userId, items: [] });
-            if (!newCart) throw new Error("Failed to create cart");
-
-            cart = newCart.toObject ? newCart.toObject() : newCart;
-        } else {
-
+            cart = await CartModel.findOneAndUpdate(
+                { userId },
+                { $push: { items: { productId, variantId, quantity } } },
+                { new: true, upsert: true } // Upsert generates cart if user doesn't have one
+            ).lean();
         }
 
-        const existingItemIndex = cart.items.findIndex(item =>
-            item.productId.toString() === productId &&
-            ((!item.variantId && !variantId) || (item.variantId && item.variantId.toString() === variantId))
-        );
-
-        if (existingItemIndex > -1) {
-            cart.items[existingItemIndex].quantity += quantity;
-        } else {
-            cart.items.push({ productId, variantId, quantity });
+        // Fetch Tax and Coupon (if applicable) outside calculation
+        const tax = await getDefaultTax();
+        let coupon: any = null;
+        if (cart.couponCode) {
+            coupon = await CouponModel.findById(cart.couponCode).lean();
         }
 
-        cart = await calcCartTotal(cart);
-        const { _id, ...cartData } = cart;
+        // Calculate totals with in-memory objects
+        cart = await calcCartTotal(cart, coupon, tax);
+
+        // Save updated totals
+        const { _id, items, ...cartData } = cart; // Don't overwrite items array which might have changed concurrently (though less likely with atomic op above, but safe practice)
         await updateData(CartModel, { _id: cart._id }, cartData, {});
 
         return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage("Item added to cart"), cart, {}));
@@ -130,7 +139,13 @@ export const getCart = async (req, res) => {
             return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage("Cart is empty"), { items: [] }, {}));
         }
 
-        cart = await calcCartTotal(cart);
+        const tax = await getDefaultTax();
+        let coupon: any = null;
+        if (cart.couponCode) {
+            coupon = await CouponModel.findById(cart.couponCode).lean();
+        }
+
+        cart = await calcCartTotal(cart, coupon, tax);
         const { _id, ...cartData } = cart;
         await updateData(CartModel, { _id: cart._id }, cartData, {});
 
@@ -178,7 +193,14 @@ export const updateQuantity = async (req, res) => {
 
         if (itemIndex > -1) {
             cart.items[itemIndex].quantity = quantity;
-            cart = await calcCartTotal(cart);
+
+            const tax = await getDefaultTax();
+            let coupon: any = null;
+            if (cart.couponCode) {
+                coupon = await CouponModel.findById(cart.couponCode).lean();
+            }
+
+            cart = await calcCartTotal(cart, coupon, tax);
             const { _id, ...cartData } = cart;
             await updateData(CartModel, { _id: cart._id }, cartData, {});
             const populatedCart = await CartModel.findById(cart._id)
@@ -224,7 +246,13 @@ export const removeItem = async (req, res) => {
                 ((!item.variantId && !variantId) || (item.variantId && item.variantId.toString() === variantId)))
         );
 
-        cart = await calcCartTotal(cart);
+        const tax = await getDefaultTax();
+        let coupon: any = null;
+        if (cart.couponCode) {
+            coupon = await CouponModel.findById(cart.couponCode).lean();
+        }
+
+        cart = await calcCartTotal(cart, coupon, tax);
         const { _id, ...cartData } = cart;
         await updateData(CartModel, { _id: cart._id }, cartData, {});
 
@@ -266,7 +294,10 @@ export const applyCoupon = async (req, res) => {
         }
 
         cart.couponCode = coupon._id;
-        cart = await calcCartTotal(cart);
+
+        const tax = await getDefaultTax();
+
+        cart = await calcCartTotal(cart, coupon, tax);
         const { _id, ...cartData } = cart;
         await updateData(CartModel, { _id: cart._id }, cartData, {});
         const populatedCart = await CartModel.findById(cart._id)
@@ -295,7 +326,10 @@ export const removeCoupon = async (req, res) => {
         if (!cart) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage("Cart not found"), {}, {}));
 
         cart.couponCode = undefined;
-        cart = await calcCartTotal(cart);
+
+        const tax = await getDefaultTax();
+
+        cart = await calcCartTotal(cart, null, tax);
         const { _id, ...cartData } = cart;
         await updateData(CartModel, { _id: cart._id }, cartData, {});
 
