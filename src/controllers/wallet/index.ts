@@ -1,10 +1,11 @@
 import { Request, Response } from "express";
 import { apiResponse, STATUS_CODE, TransactionStatus, TransactionType } from "../../common";
 import { TransactionModel, UserModel } from "../../database";
-import { countData, createData, getData, updateData, responseMessage } from "../../helpers";
+import { countData, createData, getData, updateData, responseMessage, reqInfo } from "../../helpers";
 import { addMoneyValidation, getTransactionsValidation } from "../../validations";
 
 export const getWallet = async (req: Request, res: Response) => {
+    reqInfo(req);
     try {
         const user: any = req.headers.user;
         // User is already verified and attached to headers by verifyToken middleware
@@ -17,6 +18,7 @@ export const getWallet = async (req: Request, res: Response) => {
 };
 
 export const getTransactions = async (req: Request, res: Response) => {
+    reqInfo(req);
     try {
         const { error, value } = getTransactionsValidation.validate(req.query);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -47,6 +49,7 @@ export const getTransactions = async (req: Request, res: Response) => {
 };
 
 export const addMoney = async (req: Request, res: Response) => {
+    reqInfo(req);
     try {
         const { error, value } = addMoneyValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));

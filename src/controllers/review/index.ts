@@ -1,9 +1,10 @@
 import { apiResponse, STATUS_CODE } from "../../common";
 import { ReviewModel, OrderModel } from "../../database";
-import { responseMessage, createData, getFirstMatch } from "../../helpers";
+import { responseMessage, createData, getFirstMatch, reqInfo } from "../../helpers";
 import { addReviewValidation } from "../../validations";
 
 export const addReview = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = addReviewValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));

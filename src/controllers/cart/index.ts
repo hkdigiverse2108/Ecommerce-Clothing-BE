@@ -176,6 +176,7 @@ export const getCart = async (req, res) => {
 };
 
 export const updateQuantity = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = updateQuantityValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -231,6 +232,7 @@ export const updateQuantity = async (req, res) => {
 };
 
 export const removeItem = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = removeItemValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -265,6 +267,7 @@ export const removeItem = async (req, res) => {
 };
 
 export const applyCoupon = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = applyCouponValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -320,6 +323,7 @@ export const applyCoupon = async (req, res) => {
 };
 
 export const removeCoupon = async (req, res) => {
+    reqInfo(req);
     try {
         const userId = req.headers.user._id;
         let cart: any = await getFirstMatch(CartModel, { userId }, {}, {});

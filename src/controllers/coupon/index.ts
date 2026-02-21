@@ -1,9 +1,10 @@
 import { apiResponse, STATUS_CODE } from "../../common";
 import { CouponModel } from "../../database";
-import { countData, createData, getData, getFirstMatch, responseMessage, updateData } from "../../helpers";
+import { countData, createData, getData, getFirstMatch, reqInfo, responseMessage, updateData } from "../../helpers";
 import { couponValidation, deleteCouponValidation, getCouponByIdValidation, getCouponValidation, updateCouponValidation } from "../../validations";
 
 export const addCoupon = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = couponValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -23,6 +24,7 @@ export const addCoupon = async (req, res) => {
 };
 
 export const updateCoupon = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = updateCouponValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -44,6 +46,7 @@ export const updateCoupon = async (req, res) => {
 };
 
 export const getCoupon = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getCouponValidation.validate(req.query);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -77,6 +80,7 @@ export const getCoupon = async (req, res) => {
 };
 
 export const getCouponById = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getCouponByIdValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -92,6 +96,7 @@ export const getCouponById = async (req, res) => {
 };
 
 export const deleteCoupon = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = deleteCouponValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));

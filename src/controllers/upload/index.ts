@@ -2,8 +2,10 @@ import { ALLOWED_FILE_TYPES, apiResponse, FILE_TYPE, STATUS_CODE } from "../../c
 import path from "path";
 import fs from "fs";
 import { getFilesValidator } from "../../validations";
+import { reqInfo } from "../../helpers";
 
 export const uploadImages = async (req, res) => {
+    reqInfo(req);
     try {
         if (!req.files || (req.files as any[]).length === 0) {
             return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, "No files uploaded.", {}, {}));
@@ -23,6 +25,7 @@ export const uploadImages = async (req, res) => {
 };
 
 export const getImages = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getFilesValidator.validate(req.query);
         if (error) {
@@ -68,6 +71,7 @@ export const getImages = async (req, res) => {
 };
 
 export const deleteImage = async (req, res) => {
+    reqInfo(req);
     try {
         const { url, filename } = req.body;
         let fileToDelete = "";

@@ -1,7 +1,7 @@
 import { skip } from "node:test";
 import { apiResponse, orderModelName, productModelName, reviewModelName, STATUS_CODE, colorModelName } from "../../common";
 import { ProductModel, VariantModel, OrderModel, ReviewModel } from "../../database";
-import { countData, createData, getData, responseMessage, updateData, getFirstMatch, aggregateData, findAllWithPopulate, findOneAndPopulate, aggregateAndPopulate } from "../../helpers";
+import { countData, createData, getData, responseMessage, updateData, getFirstMatch, aggregateData, findAllWithPopulate, findOneAndPopulate, aggregateAndPopulate, reqInfo } from "../../helpers";
 import { addProductValidation, getProductValidation, updateProductValidation, getProductByIdValidation, deleteProductValidation, getProductBySlugValidation } from "../../validations";
 import mongoose from "mongoose";
 
@@ -215,6 +215,7 @@ export const getProduct = async (req, res) => {
 }
 
 export const getProductById = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getProductByIdValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -252,6 +253,7 @@ export const getProductById = async (req, res) => {
 }
 
 export const deleteProduct = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = deleteProductValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -267,6 +269,7 @@ export const deleteProduct = async (req, res) => {
 }
 
 export const getProductBySlug = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getProductBySlugValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -304,6 +307,7 @@ export const getProductBySlug = async (req, res) => {
 }
 
 export const getPopularProducts = async (req, res) => {
+    reqInfo(req);
     try {
         let popularProducts = await aggregateData(OrderModel, [
             { $unwind: "$orderItems" },
@@ -370,6 +374,7 @@ export const getPopularProducts = async (req, res) => {
 }
 
 export const getRecommendedProducts = async (req, res) => {
+    reqInfo(req);
     try {
         // Simple implementation: Random 10 active products
         const recommendedProducts = await aggregateAndPopulate(ProductModel, [
@@ -402,11 +407,13 @@ export const getRecommendedProducts = async (req, res) => {
 }
 
 export const getBestSellers = async (req, res) => {
+    reqInfo(req);
     // Currently same logic as Popular products, can be customized later
     return getPopularProducts(req, res);
 }
 
 export const getOfferProducts = async (req, res) => {
+    reqInfo(req);
     try {
         const offers = await aggregateData(VariantModel, [
             {

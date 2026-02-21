@@ -39,6 +39,7 @@ export const wishlist = async (req, res) => {
 }
 
 export const getWishlist = async (req, res) => {
+    reqInfo(req);
     try {
         const userId = req.headers.user._id;
 
@@ -89,6 +90,7 @@ export const getWishlist = async (req, res) => {
 }
 
 export const clearWishlist = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = clearWishlistValidation.validate(req.params);
         if (error)

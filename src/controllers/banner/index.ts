@@ -1,9 +1,10 @@
 import { apiResponse, STATUS_CODE } from "../../common";
 import { BannerModel } from "../../database";
-import { createData, getData, getFirstMatch, responseMessage, updateData } from "../../helpers";
+import { createData, getData, getFirstMatch, reqInfo, responseMessage, updateData } from "../../helpers";
 import { addBannerValidation, getBannerValidation, updateBannerValidation, getBannerByIdValidation, deleteBannerValidation } from "../../validations";
 
 export const addBanner = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = addBannerValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -20,6 +21,7 @@ export const addBanner = async (req, res) => {
 };
 
 export const updateBanner = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = updateBannerValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -36,6 +38,7 @@ export const updateBanner = async (req, res) => {
 };
 
 export const getBanner = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getBannerValidation.validate(req.query);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -68,6 +71,7 @@ export const getBanner = async (req, res) => {
 };
 
 export const getBannerById = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getBannerByIdValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -84,6 +88,7 @@ export const getBannerById = async (req, res) => {
 };
 
 export const deleteBanner = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = deleteBannerValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));

@@ -1,11 +1,12 @@
 import { apiResponse, STATUS_CODE, PaymentStatus, PaymentMethod, OrderStatus, TransactionType, TransactionStatus } from "../../common";
 import { OrderModel, CartModel, ProductModel, VariantModel, AddressModel, TransactionModel, UserModel } from "../../database";
-import { responseMessage, getFirstMatch, createData, updateData, deleteData, countData, getData } from "../../helpers";
+import { responseMessage, getFirstMatch, createData, updateData, deleteData, countData, getData, reqInfo } from "../../helpers";
 import { createOrderValidation, getMyOrdersValidation, getOrderByIdValidation } from "../../validations";
 
 import Razorpay from "razorpay";
 
 export const createOrder = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = createOrderValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -218,6 +219,7 @@ export const createOrder = async (req, res) => {
 };
 
 export const getMyOrders = async (req, res) => {
+    reqInfo(req);
     try {
         const user = req.headers.user;
         const userId = user ? user._id : null;
@@ -258,6 +260,7 @@ export const getMyOrders = async (req, res) => {
 };
 
 export const getOrderById = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getOrderByIdValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));

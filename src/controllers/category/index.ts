@@ -72,6 +72,7 @@ export const getCategory = async (req, res) => {
 }
 
 export const getById = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getCategoryByIdValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
@@ -87,6 +88,7 @@ export const getById = async (req, res) => {
 }
 
 export const deleteCategory = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = deleteCategoryValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));

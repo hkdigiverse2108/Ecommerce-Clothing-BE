@@ -1,9 +1,11 @@
+import { reqInfo } from './../../helpers';
 import { apiResponse, STATUS_CODE } from "../../common";
 import { ColorModel } from "../../database";
 import { countData, createData, getData, getFirstMatch, updateData } from "../../helpers";
 import { addColorValidation, getColorValidation, updateColorValidation, getColorByIdValidation, deleteColorValidation } from "../../validations";
 
 export const addColor = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = addColorValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, error.details[0].message, {}, {}));
@@ -20,6 +22,7 @@ export const addColor = async (req, res) => {
 }
 
 export const updateColor = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = updateColorValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, error.details[0].message, {}, {}));
@@ -40,6 +43,7 @@ export const updateColor = async (req, res) => {
 }
 
 export const getColor = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getColorValidation.validate(req.body);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, error.details[0].message, {}, {}));
@@ -77,6 +81,7 @@ export const getColor = async (req, res) => {
 }
 
 export const getColorById = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = getColorByIdValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, error.details[0].message, {}, {}));
@@ -92,6 +97,7 @@ export const getColorById = async (req, res) => {
 }
 
 export const deleteColor = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = deleteColorValidation.validate(req.params);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, error.details[0].message, {}, {}));
