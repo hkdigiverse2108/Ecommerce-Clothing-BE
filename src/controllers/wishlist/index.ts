@@ -1,9 +1,11 @@
-import { apiResponse, STATUS_CODE, userModelName, wishlistModelName } from "../../common";
+import { apiResponse, STATUS_CODE, userModelName, wishlistModelName, colorModelName } from "../../common";
 import { ProductModel, UserModel, WishlistModel } from "../../database";
-import { createData, findOneAndPopulate, getFirstMatch, responseMessage, updateData } from "../../helpers";
+import { createData, findOneAndPopulate, getFirstMatch, responseMessage, updateData, aggregateAndPopulate, reqInfo } from "../../helpers";
 import { clearWishlistValidation, getWishlistValidation, wishlistValidation } from "../../validations";
+import { getProductStatsStages } from "../product";
 
 export const wishlist = async (req, res) => {
+    reqInfo(req);
     try {
         const { error, value } = wishlistValidation.validate(req.body);
         if (error)
@@ -13,22 +15,22 @@ export const wishlist = async (req, res) => {
 
         const user = await getFirstMatch(UserModel, { _id: userId, isDeleted: false }, {}, {});
         if (!user)
-            return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.getDataNotFound('User'), {}, error.message));
+            return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.getDataNotFound('User'), {}, {}));
 
         const product = await getFirstMatch(ProductModel, { _id: productId, isDeleted: false }, {}, {});
         if (!product)
-            return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.getDataNotFound('Product'), {}, error.message));
+            return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.getDataNotFound('Product'), {}, {}));
 
         // if product is already in wishlist then remove it
         const wishlist = await getFirstMatch(WishlistModel, { userId, productIds: { $in: [productId] } }, {}, {});
         if (wishlist) {
             const data = await updateData(WishlistModel, { _id: wishlist._id }, { $pull: { productIds: productId } }, { new: true });
-            return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage('Product removed from wishlist'), data, error.message));
+            return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage('Product removed from wishlist'), data, {}));
         }
 
         // if product is not in wishlist then add it
         const data = await updateData(WishlistModel, { userId }, { $push: { productIds: productId } }, { upsert: true, new: true });
-        return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage('Product added to wishlist'), data, error.message));
+        return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage('Product added to wishlist'), data, {}));
 
     } catch (error) {
         console.error(error);
@@ -44,11 +46,41 @@ export const getWishlist = async (req, res) => {
         if (!user)
             return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.getDataNotFound('User'), {}, {}));
 
-        // show the product details in wishlist
-        let wishlist = await findOneAndPopulate(WishlistModel, { userId }, {}, {}, [{ path: "productIds" }]);
-        if (!wishlist) wishlist = await createData(WishlistModel, { userId, productIds: [] });
+        let wishlist: any = await getFirstMatch(WishlistModel, { userId }, {}, {});
+        if (!wishlist) {
+            wishlist = await createData(WishlistModel, { userId, productIds: [] });
+            return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage('Wishlist retrieved successfully'), wishlist, {}));
+        }
 
-        return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage('Wishlist retrieved successfully'), wishlist, {}));
+        let wishlistProducts = [];
+        if (wishlist.productIds && wishlist.productIds.length > 0) {
+            wishlistProducts = await aggregateAndPopulate(ProductModel, [
+                { $match: { _id: { $in: wishlist.productIds }, isDeleted: false } },
+                ...getProductStatsStages(),
+                {
+                    $project: {
+                        product: "$$ROOT",
+                        rating: 1,
+                        totalReviews: 1,
+                        totalSold: 1
+                    }
+                },
+                {
+                    $project: {
+                        "product.rating": 0,
+                        "product.totalReviews": 0,
+                        "product.totalSold": 0
+                    }
+                }
+            ], { path: "product.attributes.color", model: colorModelName });
+        }
+
+        const responseWishlist = {
+            ...wishlist,
+            productIds: wishlistProducts
+        };
+
+        return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.customMessage('Wishlist retrieved successfully'), responseWishlist, {}));
 
     } catch (error) {
         console.error(error);
