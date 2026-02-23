@@ -26,6 +26,7 @@ export const updateAddressValidation = joi.object({
 export const getAddressValidation = joi.object({
     page: joi.number().optional().default(1),
     limit: joi.number().optional(),
+    userId: objectId().optional(),
 });
 
 export const getAddressByIdValidation = commonIdSchema;

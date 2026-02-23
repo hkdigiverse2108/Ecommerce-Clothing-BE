@@ -56,13 +56,13 @@ export const getAddress = async (req, res) => {
         const { error, value } = getAddressValidation.validate(req.query);
         if (error) return res.status(STATUS_CODE.BAD_REQUEST).json(new apiResponse(STATUS_CODE.BAD_REQUEST, responseMessage.customMessage(error.details[0].message), {}, {}));
 
-        const { page, limit } = value;
+        const { page, limit, userId } = value;
 
         const user = req.headers.user;
 
-        const address = await getData(AddressModel, { userId: user._id, isDeleted: false }, {}, { skip: (page - 1) * limit, limit });
+        const address = await getData(AddressModel, { userId: userId || user._id, isDeleted: false }, {}, { skip: (page - 1) * limit, limit });
 
-        const total = await countData(AddressModel, { userId: user._id, isDeleted: false });
+        const total = await countData(AddressModel, { userId: userId || user._id, isDeleted: false });
 
         return res.status(STATUS_CODE.SUCCESS).json(new apiResponse(STATUS_CODE.SUCCESS, responseMessage.getDataSuccess("Address"), { address, state: { page, limit, totalPage: total / limit ? total / limit : 1 }, total }, {}));
     } catch (error) {
